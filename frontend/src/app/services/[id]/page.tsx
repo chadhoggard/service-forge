@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Service, Deployment, HealthCheck } from "@/types";
+import { Service, Deployment, HealthCheck, DeploymentStatus } from "@/types";
 import {
   getService,
   getDeployments,
@@ -34,7 +34,13 @@ export default function ServiceDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showDeployForm, setShowDeployForm] = useState(false);
   const [showTriggerForm, setShowTriggerForm] = useState(false);
-  const [deployForm, setDeployForm] = useState({
+  const [deployForm, setDeployForm] = useState<{
+    version: string;
+    image_uri: string;
+    commit_sha: string;
+    notes: string;
+    status: DeploymentStatus;
+  }>({
     version: "",
     image_uri: "",
     commit_sha: "",
@@ -139,7 +145,7 @@ export default function ServiceDetailPage() {
         status: deployForm.status,
       });
       setShowDeployForm(false);
-      setDeployForm({ version: "", image_uri: "", commit_sha: "", notes: "", status: "succeeded" });
+      setDeployForm({ version: "", image_uri: "", commit_sha: "", notes: "", status: "succeeded" as DeploymentStatus });
       toast(`Deployed version ${deployForm.version}`, "success");
       await loadData();
     } catch (err: unknown) {
@@ -386,7 +392,7 @@ export default function ServiceDetailPage() {
                 <select
                   value={deployForm.status}
                   onChange={(e) =>
-                    setDeployForm({ ...deployForm, status: e.target.value })
+                    setDeployForm({ ...deployForm, status: e.target.value as DeploymentStatus })
                   }
                   className={FIELD}
                 >
