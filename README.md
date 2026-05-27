@@ -71,6 +71,8 @@ Once running:
 | File                  | Variable              | Default                                                              | Description                   |
 | --------------------- | --------------------- | -------------------------------------------------------------------- | ----------------------------- |
 | `backend/.env`        | `DATABASE_URL`        | `postgresql://serviceforge:serviceforge@localhost:5432/serviceforge` | PostgreSQL connection string  |
+| `backend/.env`        | `GITHUB_TOKEN`        | _(empty)_                                                            | GitHub fine-grained token     |
+| `backend/.env`        | `GITHUB_WORKFLOW_FILE`| `deploy.yml`                                                         | Workflow file to dispatch     |
 | `frontend/.env.local` | `NEXT_PUBLIC_API_URL` | `http://localhost:8000`                                              | Backend URL (browser-visible) |
 
 ### Docker Compose Commands
@@ -145,17 +147,128 @@ docker build -t serviceforge-frontend \
 | Port 5432/8000/3000 already in use   | Stop conflicting local services or change host ports in `docker-compose.yml`                    |
 | `npm ci` fails on Apple Silicon      | Clear `node_modules` and `.next` volumes: `docker compose down -v && docker compose up --build` |
 
+## Trigger Deployment (GitHub Actions Integration)
+
+The **Trigger Deployment** button on each service detail page dispatches a GitHub Actions `workflow_dispatch` event and immediately records a `building` deployment. When your workflow completes, it can call back to `PATCH /api/deployments/{id}` to update the status to `succeeded` or `failed`.
+
+### 1. Create a GitHub Fine-Grained Token
+
+1. Go to **GitHub → Settings → Developer Settings → Personal access tokens → Fine-grained tokens**
+2. Click **Generate new token**
+3. Set **Resource owner** to your user or org
+4. Under **Repository access**, select the repos ServiceForge will deploy
+5. Grant these **Repository permissions**:
+   - **Actions** — Read and write
+   - **Contents** — Read-only
+   - **Metadata** — Read-only (auto-selected)
+6. Copy the token — it starts with `github_pat_...`
+
+### 2. Configure Environment Variables
+
+Add to `backend/.env`:
+
+```bash
+GITHUB_TOKEN=github_pat_your_token_here
+GITHUB_WORKFLOW_FILE=deploy.yml   # name of the workflow file in .github/workflows/
+```
+
+Restart the backend to pick up the new vars:
+
+```bash
+docker compose restart backend
+```
+
+### 3. Add a Workflow File to the Target Repo
+
+ServiceForge dispatches `workflow_dispatch` with these inputs:
+
+| Input | Value |
+|---|---|
+| `version` | version tag you entered (e.g. `v1.2.3`) |
+| `environment` | environment from the service (e.g. `development`) |
+| `deployment_id` | UUID of the deployment record in ServiceForge |
+
+Create `.github/workflows/deploy.yml` in your target repo:
+
+```yaml
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to deploy'
+        required: true
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+      deployment_id:
+        description: 'ServiceForge deployment ID (for status callback)'
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push image
+        run: |
+          echo "Building ${{ inputs.version }} for ${{ inputs.environment }}"
+          # docker build / push steps go here
+
+      - name: Report success to ServiceForge
+        if: success()
+        run: |
+          curl -s -X PATCH ${{ secrets.SERVICEFORGE_API_URL }}/api/deployments/${{ inputs.deployment_id }} \
+            -H "Content-Type: application/json" \
+            -d '{"status": "succeeded"}'
+
+      - name: Report failure to ServiceForge
+        if: failure()
+        run: |
+          curl -s -X PATCH ${{ secrets.SERVICEFORGE_API_URL }}/api/deployments/${{ inputs.deployment_id }} \
+            -H "Content-Type: application/json" \
+            -d '{"status": "failed"}'
+```
+
+Add `SERVICEFORGE_API_URL` as a secret in your repo settings (e.g. `http://your-serviceforge-host:8000`).
+
+### 4. Test Locally
+
+1. Open the service detail page at `http://localhost:3000/services/{id}`
+2. Click **Trigger Deployment** (indigo button)
+3. Enter a version tag (e.g. `v1.0.0`) and optionally a git ref and notes
+4. Click **Trigger Deployment** — the form shows a spinner while dispatching
+5. On success: a `building` deployment appears in the history table
+6. The GitHub Actions run will appear in your repo's **Actions** tab
+7. When the workflow finishes, it calls back and the deployment status updates to `succeeded` or `failed`
+
+**If the button shows an error:**
+
+| Error | Cause |
+|---|---|
+| `GITHUB_TOKEN is not configured` | `GITHUB_TOKEN` missing from `backend/.env` |
+| `GitHub token is invalid or expired` | Token is wrong or has been revoked |
+| `GitHub token lacks required permissions` | Re-create the token with Actions: Read/Write |
+| `Repository or workflow file not found` | Wrong workflow filename or repo URL |
+| `Invalid ref` | Branch/tag doesn't exist in the target repo |
+
+---
+
 ## API Endpoints
 
 ### Services
 
-| Method | Endpoint           | Description         |
-| ------ | ------------------ | ------------------- |
-| GET    | /api/services/     | List all services   |
-| GET    | /api/services/{id} | Get service details |
-| POST   | /api/services/     | Create a service    |
-| PUT    | /api/services/{id} | Update a service    |
-| DELETE | /api/services/{id} | Delete a service    |
+| Method | Endpoint                                      | Description                    |
+| ------ | --------------------------------------------- | ------------------------------ |
+| GET    | /api/services/                                | List all services              |
+| GET    | /api/services/{id}                            | Get service details            |
+| POST   | /api/services/                                | Create a service               |
+| PUT    | /api/services/{id}                            | Update a service               |
+| DELETE | /api/services/{id}                            | Delete a service               |
+| POST   | /api/services/{id}/trigger-deployment         | Dispatch GitHub Actions + record deployment |
 
 ### Deployments
 

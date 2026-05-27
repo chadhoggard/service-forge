@@ -45,3 +45,17 @@ class DeploymentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TriggerDeploymentRequest(BaseModel):
+    version: str = Field(..., min_length=1, max_length=100)
+    environment: str = Field(..., max_length=50)
+    ref: str = Field(default="main", max_length=255)
+    image_uri: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class TriggerDeploymentResponse(BaseModel):
+    success: bool
+    message: str
+    deployment: DeploymentResponse

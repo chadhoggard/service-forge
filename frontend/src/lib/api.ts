@@ -4,6 +4,8 @@ import {
   ServiceUpdate,
   Deployment,
   DeploymentCreate,
+  TriggerDeploymentRequest,
+  TriggerDeploymentResponse,
   HealthCheck,
 } from "@/types";
 
@@ -58,6 +60,12 @@ export const createDeployment = (data: DeploymentCreate) =>
 export const rollbackDeployment = (deploymentId: string) =>
   fetchAPI<Deployment>(`/api/deployments/${deploymentId}/rollback`, {
     method: "POST",
+  });
+
+export const triggerDeployment = (serviceId: string, data: TriggerDeploymentRequest) =>
+  fetchAPI<TriggerDeploymentResponse>(`/api/services/${serviceId}/trigger-deployment`, {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 
 // ── Health Checks

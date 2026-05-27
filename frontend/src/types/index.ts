@@ -63,6 +63,20 @@ export interface DeploymentCreate {
   notes?: string;
 }
 
+export interface TriggerDeploymentRequest {
+  version: string;
+  environment: string;
+  ref: string;
+  image_uri?: string;
+  notes?: string;
+}
+
+export interface TriggerDeploymentResponse {
+  success: boolean;
+  message: string;
+  deployment: Deployment;
+}
+
 // ─── Health Check ───────────────────────────────────────────────────────────
 
 export interface HealthCheck {

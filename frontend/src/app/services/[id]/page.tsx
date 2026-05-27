@@ -11,6 +11,7 @@ import {
   deleteService,
   rollbackDeployment,
   createDeployment,
+  triggerDeployment,
 } from "@/lib/api";
 import DeploymentTable from "@/components/DeploymentTable";
 import HealthCheckCard from "@/components/HealthCheckCard";
@@ -32,12 +33,20 @@ export default function ServiceDetailPage() {
   const [deploysLoading, setDeploysLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeployForm, setShowDeployForm] = useState(false);
+  const [showTriggerForm, setShowTriggerForm] = useState(false);
   const [deployForm, setDeployForm] = useState({
     version: "",
     image_uri: "",
     commit_sha: "",
     notes: "",
+    status: "succeeded",
   });
+  const [triggerForm, setTriggerForm] = useState({
+    version: "",
+    ref: "main",
+    notes: "",
+  });
+  const [triggering, setTriggering] = useState(false);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -95,6 +104,28 @@ export default function ServiceDetailPage() {
     }
   }
 
+  async function handleTrigger(e: React.FormEvent) {
+    e.preventDefault();
+    if (!service) return;
+    try {
+      setTriggering(true);
+      const result = await triggerDeployment(serviceId, {
+        version: triggerForm.version.trim(),
+        environment: service.environment,
+        ref: triggerForm.ref.trim() || "main",
+        notes: triggerForm.notes.trim() || undefined,
+      });
+      setShowTriggerForm(false);
+      setTriggerForm({ version: "", ref: "main", notes: "" });
+      toast(result.message, "success");
+      await loadData();
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Trigger failed", "error");
+    } finally {
+      setTriggering(false);
+    }
+  }
+
   async function handleDeploy(e: React.FormEvent) {
     e.preventDefault();
     try {
@@ -105,10 +136,10 @@ export default function ServiceDetailPage() {
         environment: service?.environment ?? "development",
         commit_sha: deployForm.commit_sha.trim() || undefined,
         notes: deployForm.notes.trim() || undefined,
-        status: "succeeded",
+        status: deployForm.status,
       });
       setShowDeployForm(false);
-      setDeployForm({ version: "", image_uri: "", commit_sha: "", notes: "" });
+      setDeployForm({ version: "", image_uri: "", commit_sha: "", notes: "", status: "succeeded" });
       toast(`Deployed version ${deployForm.version}`, "success");
       await loadData();
     } catch (err: unknown) {
@@ -187,11 +218,23 @@ export default function ServiceDetailPage() {
             Edit
           </a>
           <button
-            onClick={() => setShowDeployForm((v) => !v)}
-            className="bg-forge-600 text-white px-4 py-2 rounded-lg hover:bg-forge-700 transition-colors text-sm font-semibold"
-          >
-            {showDeployForm ? "Cancel" : "New Deployment"}
-          </button>
+              onClick={() => {
+                setShowTriggerForm((v) => !v);
+                setShowDeployForm(false);
+              }}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold"
+            >
+              {showTriggerForm ? "Cancel" : "Trigger Deployment"}
+            </button>
+            <button
+              onClick={() => {
+                setShowDeployForm((v) => !v);
+                setShowTriggerForm(false);
+              }}
+              className="bg-forge-600 text-white px-4 py-2 rounded-lg hover:bg-forge-700 transition-colors text-sm font-semibold"
+            >
+              {showDeployForm ? "Cancel" : "Record Deployment"}
+            </button>
           <button
             onClick={handleDelete}
             className="px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 transition-colors text-sm font-medium"
@@ -209,6 +252,81 @@ export default function ServiceDetailPage() {
           onRunCheck={handleRunCheck}
         />
       </div>
+
+      {/* Trigger Deployment Form */}
+      {showTriggerForm && (
+        <div className="bg-indigo-50 rounded-xl border border-indigo-200 p-6 mb-6 animate-in">
+          <h2 className="text-base font-semibold text-indigo-900 mb-1">
+            Trigger GitHub Actions Deployment
+          </h2>
+          <p className="text-xs text-indigo-600 mb-4">
+            Dispatches the <code className="font-mono">{service.repo_url}</code> workflow and records a <span className="font-medium">building</span> deployment.
+          </p>
+          <form onSubmit={handleTrigger} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Version / Tag <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={triggerForm.version}
+                  onChange={(e) => setTriggerForm({ ...triggerForm, version: e.target.value })}
+                  className={FIELD}
+                  placeholder="v1.2.3"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Git Ref
+                </label>
+                <input
+                  type="text"
+                  value={triggerForm.ref}
+                  onChange={(e) => setTriggerForm({ ...triggerForm, ref: e.target.value })}
+                  className={FIELD}
+                  placeholder="main"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <input
+                  type="text"
+                  value={triggerForm.notes}
+                  onChange={(e) => setTriggerForm({ ...triggerForm, notes: e.target.value })}
+                  className={FIELD}
+                  placeholder="What does this deployment include?"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={triggering}
+                className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {triggering && (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                )}
+                {triggering ? "Dispatching…" : "Trigger Deployment"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTriggerForm(false)}
+                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Deploy Form */}
       {showDeployForm && (
@@ -260,6 +378,25 @@ export default function ServiceDetailPage() {
                   className={FIELD}
                   placeholder="abc1234"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={deployForm.status}
+                  onChange={(e) =>
+                    setDeployForm({ ...deployForm, status: e.target.value })
+                  }
+                  className={FIELD}
+                >
+                  <option value="succeeded">succeeded</option>
+                  <option value="deploying">deploying</option>
+                  <option value="failed">failed</option>
+                  <option value="pending">pending</option>
+                  <option value="building">building</option>
+                  <option value="rolled_back">rolled_back</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
