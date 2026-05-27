@@ -28,6 +28,7 @@ env:
   BACKEND_TASK_FAMILY: serviceforge-production-backend
   FRONTEND_TASK_FAMILY: serviceforge-production-frontend
   SERVICEFORGE_API: http://serviceforge-production-alb-1977889151.us-east-1.elb.amazonaws.com
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ── Build & push backend ─────────────────────────────────────────────────
