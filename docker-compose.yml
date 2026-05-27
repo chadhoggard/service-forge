@@ -27,6 +27,9 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://serviceforge:serviceforge@postgres:5432/serviceforge
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     # Override CMD to enable hot-reload in development
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     depends_on:
