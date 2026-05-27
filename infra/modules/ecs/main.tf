@@ -223,11 +223,11 @@ resource "aws_ecs_task_definition" "frontend" {
     }
 
     healthCheck = {
-      command     = ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000 || exit 1"]
+      command     = ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))\""]
       interval    = 30
-      timeout     = 5
+      timeout     = 10
       retries     = 3
-      startPeriod = 60
+      startPeriod = 90
     }
   }])
 
@@ -262,6 +262,11 @@ resource "aws_ecs_service" "backend" {
 
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   lifecycle {
     # Ignore image changes — CI/CD updates task definition independently
@@ -299,6 +304,11 @@ resource "aws_ecs_service" "frontend" {
 
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   lifecycle {
     ignore_changes = [task_definition]
