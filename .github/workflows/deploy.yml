@@ -38,6 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       deployment_id: ${{ steps.register.outputs.deployment_id }}
+      commit_msg: ${{ steps.register.outputs.commit_msg }}
 
     steps:
       - name: Checkout
@@ -48,19 +49,20 @@ jobs:
       - name: Create or reuse deployment record
         id: register
         run: |
+          COMMIT_MSG="$(git log --format=%s -n 1 ${{ github.sha }})"
+
           # If triggered from the ServiceForge UI, the deployment record already exists
           if [ -n "${{ github.event.inputs.deployment_id }}" ]; then
             echo "deployment_id=${{ github.event.inputs.deployment_id }}" >> $GITHUB_OUTPUT
+            echo "commit_msg=${COMMIT_MSG}" >> $GITHUB_OUTPUT
             exit 0
           fi
-
-          COMMIT_MSG="$(git log --format=%s -n 1 ${{ github.sha }})"
 
           # Auto push: determine next semantic version by querying the latest
           DEPLOYMENTS="$(curl -sfL "${{ env.SERVICEFORGE_API }}/api/deployments/service/${{ env.SERVICEFORGE_SERVICE_ID }}/" \
             -H "X-Api-Key: ${{ secrets.SERVICEFORGE_API_KEY }}")"
           echo "DEBUG deployments response: $DEPLOYMENTS" | head -c 200
-          LATEST_VERSION="$(echo "$DEPLOYMENTS" | jq -r '[.[] | select(.version | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | sort_by(.version) | last | .version // "v1.0.0"')"
+          LATEST_VERSION="$(echo "$DEPLOYMENTS" | jq -r '[.[] | select(.version | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | sort_by(.version | ltrimstr("v") | split(".") | map(tonumber)) | last | .version // "v1.0.0"')"
           echo "DEBUG latest version: $LATEST_VERSION"
 
           # Increment patch using parameter expansion (avoid IFS splitting issues)
@@ -86,6 +88,7 @@ jobs:
 
           DEPLOYMENT_ID="$(echo "$RESPONSE" | jq -r '.id // empty')"
           echo "deployment_id=${DEPLOYMENT_ID}" >> $GITHUB_OUTPUT
+          echo "commit_msg=${COMMIT_MSG}" >> $GITHUB_OUTPUT
 
   # ── Build & push backend ─────────────────────────────────────────────────
   build-backend:
@@ -268,12 +271,13 @@ jobs:
         run: |
           BACKEND="${{ needs.deploy-backend.result }}"
           FRONTEND="${{ needs.deploy-frontend.result }}"
+          COMMIT_MSG="${{ needs.register-deployment.outputs.commit_msg }}"
           if [ "$BACKEND" = "success" ] && [ "$FRONTEND" = "success" ]; then
             echo "status=succeeded" >> $GITHUB_OUTPUT
-            echo "notes=Deployed backend and frontend successfully via GitHub Actions (run ${{ github.run_id }})" >> $GITHUB_OUTPUT
+            echo "notes=${COMMIT_MSG} (run ${{ github.run_id }})" >> $GITHUB_OUTPUT
           else
             echo "status=failed" >> $GITHUB_OUTPUT
-            echo "notes=Deployment failed — backend: ${BACKEND}, frontend: ${FRONTEND} (run ${{ github.run_id }})" >> $GITHUB_OUTPUT
+            echo "notes=${COMMIT_MSG} — backend: ${BACKEND}, frontend: ${FRONTEND} (run ${{ github.run_id }})" >> $GITHUB_OUTPUT
           fi
 
       - name: Patch ServiceForge deployment record
