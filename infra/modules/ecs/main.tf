@@ -229,14 +229,6 @@ resource "aws_ecs_task_definition" "frontend" {
         "awslogs-stream-prefix" = "frontend"
       }
     }
-
-    healthCheck = {
-      command     = ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))\""]
-      interval    = 30
-      timeout     = 10
-      retries     = 3
-      startPeriod = 90
-    }
   }])
 
   tags = {
