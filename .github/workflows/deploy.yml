@@ -50,13 +50,16 @@ jobs:
           fi
 
           # Auto push: determine next semantic version by querying the latest
-          DEPLOYMENTS="$(curl -s "${{ env.SERVICEFORGE_API }}/api/deployments/service/${{ env.SERVICEFORGE_SERVICE_ID }}/")"
+          DEPLOYMENTS="$(curl -sfL "${{ env.SERVICEFORGE_API }}/api/deployments/service/${{ env.SERVICEFORGE_SERVICE_ID }}/")"
+          echo "DEBUG deployments response: $DEPLOYMENTS" | head -c 200
           LATEST_VERSION="$(echo "$DEPLOYMENTS" | jq -r '[.[] | select(.version | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | sort_by(.version) | last | .version // "v1.0.0"')"
+          echo "DEBUG latest version: $LATEST_VERSION"
 
           # Increment patch using parameter expansion (avoid IFS splitting issues)
           PATCH="${LATEST_VERSION##*.}"
           PREFIX="${LATEST_VERSION%.*}"
           NEXT_VERSION="${PREFIX}.$((PATCH + 1))"
+          echo "DEBUG next version: $NEXT_VERSION"
 
           PAYLOAD="$(jq -n \
             --arg service_id "${{ env.SERVICEFORGE_SERVICE_ID }}" \
