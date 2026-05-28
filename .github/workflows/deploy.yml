@@ -40,6 +40,11 @@ jobs:
       deployment_id: ${{ steps.register.outputs.deployment_id }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Create or reuse deployment record
         id: register
         run: |
@@ -48,6 +53,8 @@ jobs:
             echo "deployment_id=${{ github.event.inputs.deployment_id }}" >> $GITHUB_OUTPUT
             exit 0
           fi
+
+          COMMIT_MSG="$(git log --format=%s -n 1 ${{ github.sha }})"
 
           # Auto push: determine next semantic version by querying the latest
           DEPLOYMENTS="$(curl -sfL "${{ env.SERVICEFORGE_API }}/api/deployments/service/${{ env.SERVICEFORGE_SERVICE_ID }}/" \
@@ -68,7 +75,7 @@ jobs:
             --arg commit_sha "${{ github.sha }}" \
             --arg environment "production" \
             --arg status "building" \
-            --arg notes "Auto-deployed from push to main (run ${{ github.run_id }})" \
+            --arg notes "${COMMIT_MSG} (run ${{ github.run_id }})" \
             '{service_id: $service_id, version: $version, commit_sha: $commit_sha, environment: $environment, status: $status, notes: $notes}')"
 
           RESPONSE="$(curl -sf -X POST \
