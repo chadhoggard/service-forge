@@ -50,7 +50,8 @@ jobs:
           fi
 
           # Auto push: determine next semantic version by querying the latest
-          DEPLOYMENTS="$(curl -sfL "${{ env.SERVICEFORGE_API }}/api/deployments/service/${{ env.SERVICEFORGE_SERVICE_ID }}/")"
+          DEPLOYMENTS="$(curl -sfL "${{ env.SERVICEFORGE_API }}/api/deployments/service/${{ env.SERVICEFORGE_SERVICE_ID }}/" \
+            -H "X-Api-Key: ${{ secrets.SERVICEFORGE_API_KEY }}")"
           echo "DEBUG deployments response: $DEPLOYMENTS" | head -c 200
           LATEST_VERSION="$(echo "$DEPLOYMENTS" | jq -r '[.[] | select(.version | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | sort_by(.version) | last | .version // "v1.0.0"')"
           echo "DEBUG latest version: $LATEST_VERSION"
@@ -73,6 +74,7 @@ jobs:
           RESPONSE="$(curl -sf -X POST \
             "${{ env.SERVICEFORGE_API }}/api/deployments/" \
             -H "Content-Type: application/json" \
+            -H "X-Api-Key: ${{ secrets.SERVICEFORGE_API_KEY }}" \
             -d "$PAYLOAD" || echo '{}')"
 
           DEPLOYMENT_ID="$(echo "$RESPONSE" | jq -r '.id // empty')"
@@ -279,4 +281,5 @@ jobs:
           curl -s -X PATCH \
             "${{ env.SERVICEFORGE_API }}/api/deployments/${{ needs.register-deployment.outputs.deployment_id }}" \
             -H "Content-Type: application/json" \
+            -H "X-Api-Key: ${{ secrets.SERVICEFORGE_API_KEY }}" \
             -d "$PAYLOAD"

@@ -44,6 +44,11 @@ output "db_secret_arn" {
   sensitive   = true
 }
 
+output "api_key_secret_arn" {
+  description = "Secrets Manager ARN for the CI/CD API key (retrieve value to add to GitHub Actions)"
+  value       = module.app_secrets.api_key_secret_arn
+}
+
 output "ecs_cluster_name" {
   description = "ECS cluster name"
   value       = module.ecs.cluster_name

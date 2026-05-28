@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 
   backend "s3" {
@@ -19,21 +23,18 @@ provider "aws" {
   region = var.aws_region
 }
 
-# ── ECR ────────────────────────────────────────────────────────────────────
 module "ecr" {
   source      = "./modules/ecr"
   project     = var.project
   environment = var.environment
 }
 
-# ── VPC ────────────────────────────────────────────────────────────────────
 module "vpc" {
   source      = "./modules/vpc"
   project     = var.project
   environment = var.environment
 }
 
-# ── RDS ────────────────────────────────────────────────────────────────────
 module "rds" {
   source      = "./modules/rds"
   project     = var.project
@@ -43,7 +44,12 @@ module "rds" {
   rds_security_group_id = module.vpc.rds_security_group_id
 }
 
-# ── ALB ────────────────────────────────────────────────────────────────────
+module "app_secrets" {
+  source      = "./modules/app_secrets"
+  project     = var.project
+  environment = var.environment
+}
+
 module "alb" {
   source      = "./modules/alb"
   project     = var.project
@@ -54,7 +60,6 @@ module "alb" {
   alb_security_group_id = module.vpc.alb_security_group_id
 }
 
-# ── CloudWatch ─────────────────────────────────────────────────────────────
 module "cloudwatch" {
   source      = "./modules/cloudwatch"
   project     = var.project
@@ -67,7 +72,6 @@ module "cloudwatch" {
   alb_arn_suffix        = module.alb.alb_arn_suffix
 }
 
-# ── ECS ────────────────────────────────────────────────────────────────────
 module "ecs" {
   source      = "./modules/ecs"
   project     = var.project
@@ -83,11 +87,13 @@ module "ecs" {
   backend_image_uri  = "${module.ecr.backend_repository_url}:latest"
   frontend_image_uri = "${module.ecr.frontend_repository_url}:latest"
 
-  db_secret_arn     = module.rds.secret_arn
-  github_secret_arn = "arn:aws:secretsmanager:us-east-1:503561436227:secret:serviceforge-production/github/token-G1dqsz"
-  db_host       = module.rds.db_host
-  db_port       = module.rds.db_port
-  db_name       = module.rds.db_name
+  db_secret_arn      = module.rds.secret_arn
+  github_secret_arn  = "arn:aws:secretsmanager:us-east-1:503561436227:secret:serviceforge-production/github/token-G1dqsz"
+  jwt_secret_arn     = module.app_secrets.jwt_secret_arn
+  api_key_secret_arn = module.app_secrets.api_key_secret_arn
+  db_host            = module.rds.db_host
+  db_port            = module.rds.db_port
+  db_name            = module.rds.db_name
 
   backend_target_group_arn  = module.alb.backend_target_group_arn
   frontend_target_group_arn = module.alb.frontend_target_group_arn

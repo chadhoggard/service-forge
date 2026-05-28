@@ -60,7 +60,7 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
-      Resource = [var.db_secret_arn, var.github_secret_arn]
+      Resource = [var.db_secret_arn, var.github_secret_arn, var.jwt_secret_arn, var.api_key_secret_arn]
     }]
   })
 }
@@ -169,6 +169,14 @@ resource "aws_ecs_task_definition" "backend" {
       {
         name      = "GITHUB_WORKFLOW_FILE"
         valueFrom = "${var.github_secret_arn}:GITHUB_WORKFLOW_FILE::"
+      },
+      {
+        name      = "SECRET_KEY"
+        valueFrom = var.jwt_secret_arn
+      },
+      {
+        name      = "SERVICEFORGE_API_KEY"
+        valueFrom = var.api_key_secret_arn
       }
     ]
 

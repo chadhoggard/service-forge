@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def _build_database_url() -> str:
     # If a full DATABASE_URL is provided (local Docker Compose), use it directly
     if url := os.getenv("DATABASE_URL"):
@@ -16,7 +17,11 @@ def _build_database_url() -> str:
     password = os.getenv("DB_PASSWORD", "serviceforge")
     return f"postgresql://{user}:{password}@{host}:{port}/{name}"
 
+
 DATABASE_URL: str = _build_database_url()
 
 GITHUB_TOKEN: str = os.getenv("GITHUB_TOKEN", "")
 GITHUB_WORKFLOW_FILE: str = os.getenv("GITHUB_WORKFLOW_FILE", "deploy.yml")
+SECRET_KEY: str = os.getenv("SECRET_KEY", "")
+SERVICEFORGE_API_KEY: str = os.getenv("SERVICEFORGE_API_KEY", "")
+ACCESS_TOKEN_EXPIRE_DAYS: int = 7

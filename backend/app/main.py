@@ -3,9 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 import app.models  # noqa: F401 — registers all ORM models with Base.metadata
-from app.routes import services, deployments, health_checks
+from app.routes import auth, deployments, health_checks, services
 
-# Create tables on startup (no-op if they already exist)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -16,12 +15,19 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://frontend:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://frontend:3000",
+        "http://serviceforge-production-alb-1977889151.us-east-1.elb.amazonaws.com",
+        "https://serviceforge.dev",
+        "https://www.serviceforge.dev",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(services.router, prefix="/api/services", tags=["Services"])
 app.include_router(deployments.router, prefix="/api/deployments", tags=["Deployments"])
 app.include_router(health_checks.router, prefix="/api/health-checks", tags=["Health Checks"])

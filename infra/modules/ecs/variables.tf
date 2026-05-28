@@ -18,7 +18,6 @@ variable "aws_account_id" {
   type        = string
 }
 
-# Networking
 variable "private_subnet_ids" {
   description = "Private subnet IDs for backend tasks"
   type        = list(string)
@@ -39,7 +38,6 @@ variable "frontend_security_group_id" {
   type        = string
 }
 
-# ECR
 variable "backend_image_uri" {
   description = "Full ECR image URI for the backend (e.g. account.dkr.ecr.region.amazonaws.com/repo:tag)"
   type        = string
@@ -50,7 +48,6 @@ variable "frontend_image_uri" {
   type        = string
 }
 
-# RDS
 variable "github_secret_arn" {
   description = "Secrets Manager ARN containing GITHUB_TOKEN and GITHUB_WORKFLOW_FILE"
   type        = string
@@ -58,6 +55,16 @@ variable "github_secret_arn" {
 
 variable "db_secret_arn" {
   description = "Secrets Manager ARN containing DB credentials"
+  type        = string
+}
+
+variable "jwt_secret_arn" {
+  description = "Secrets Manager ARN for JWT signing key"
+  type        = string
+}
+
+variable "api_key_secret_arn" {
+  description = "Secrets Manager ARN for CI/CD API key"
   type        = string
 }
 
@@ -77,7 +84,6 @@ variable "db_name" {
   type        = string
 }
 
-# ALB (filled in Phase 5)
 variable "backend_target_group_arn" {
   description = "ALB target group ARN for backend"
   type        = string
@@ -90,7 +96,6 @@ variable "frontend_target_group_arn" {
   default     = ""
 }
 
-# Capacity
 variable "backend_cpu" {
   description = "Fargate CPU units for backend (256/512/1024/2048)"
   type        = number

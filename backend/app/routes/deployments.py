@@ -8,13 +8,15 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.deployment import Deployment, DeploymentStatus
 from app.models.service import Service
+from app.models.user import User
 from app.schemas.deployment import DeploymentCreate, DeploymentResponse, DeploymentUpdate
+from app.utils.auth import get_ci_or_user, get_current_user
 
 router = APIRouter()
 
 
 @router.get("/service/{service_id}", response_model=List[DeploymentResponse])
-def list_deployments(service_id: UUID, db: Session = Depends(get_db)):
+def list_deployments(service_id: UUID, db: Session = Depends(get_db), _: None = Depends(get_ci_or_user)):
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -29,7 +31,7 @@ def list_deployments(service_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{deployment_id}", response_model=DeploymentResponse)
-def get_deployment(deployment_id: UUID, db: Session = Depends(get_db)):
+def get_deployment(deployment_id: UUID, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
     if not deployment:
         raise HTTPException(status_code=404, detail="Deployment not found")
@@ -37,7 +39,7 @@ def get_deployment(deployment_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=DeploymentResponse, status_code=201)
-def create_deployment(deployment_data: DeploymentCreate, db: Session = Depends(get_db)):
+def create_deployment(deployment_data: DeploymentCreate, db: Session = Depends(get_db), _: None = Depends(get_ci_or_user)):
     service = db.query(Service).filter(Service.id == deployment_data.service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -51,14 +53,18 @@ def create_deployment(deployment_data: DeploymentCreate, db: Session = Depends(g
 
 
 @router.patch("/{deployment_id}", response_model=DeploymentResponse)
-def update_deployment(deployment_id: UUID, deployment_data: DeploymentUpdate, db: Session = Depends(get_db)):
+def update_deployment(
+    deployment_id: UUID,
+    deployment_data: DeploymentUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(get_ci_or_user),
+):
     deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
     if not deployment:
         raise HTTPException(status_code=404, detail="Deployment not found")
 
     update_data = deployment_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
-        # Serialize any enum to its string value before persisting
         if hasattr(value, "value"):
             value = value.value
         setattr(deployment, key, value)
@@ -69,7 +75,11 @@ def update_deployment(deployment_id: UUID, deployment_data: DeploymentUpdate, db
 
 
 @router.post("/{deployment_id}/rollback", response_model=DeploymentResponse, status_code=201)
-def rollback_deployment(deployment_id: UUID, db: Session = Depends(get_db)):
+def rollback_deployment(
+    deployment_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
     """Create a new deployment record based on a previous successful deployment, marked as rolled_back."""
     original = db.query(Deployment).filter(Deployment.id == deployment_id).first()
     if not original:
@@ -78,7 +88,7 @@ def rollback_deployment(deployment_id: UUID, db: Session = Depends(get_db)):
     if original.status != DeploymentStatus.SUCCEEDED.value:
         raise HTTPException(
             status_code=400,
-            detail="Can only rollback to a previously succeeded deployment"
+            detail="Can only rollback to a previously succeeded deployment",
         )
 
     rollback_deployment = Deployment(

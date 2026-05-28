@@ -86,3 +86,17 @@ export interface HealthCheck {
   response_time_ms: string | null;
   checked_at: string;
 }
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  email: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AuthToken {
+  access_token: string;
+  token_type: string;
+}

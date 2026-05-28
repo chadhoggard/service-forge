@@ -10,21 +10,23 @@ from app import config
 from app.database import get_db
 from app.models.deployment import Deployment, DeploymentStatus
 from app.models.service import Service
+from app.models.user import User
 from app.schemas.deployment import TriggerDeploymentRequest, TriggerDeploymentResponse
 from app.schemas.service import ServiceCreate, ServiceResponse, ServiceUpdate
+from app.utils.auth import get_current_user
 from app.utils.github import parse_github_repo
 
 router = APIRouter()
 
 
 @router.get("/", response_model=List[ServiceResponse])
-def list_services(db: Session = Depends(get_db)):
+def list_services(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     services = db.query(Service).order_by(Service.created_at.desc()).all()
     return services
 
 
 @router.get("/{service_id}", response_model=ServiceResponse)
-def get_service(service_id: UUID, db: Session = Depends(get_db)):
+def get_service(service_id: UUID, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -32,7 +34,7 @@ def get_service(service_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=ServiceResponse, status_code=201)
-def create_service(service_data: ServiceCreate, db: Session = Depends(get_db)):
+def create_service(service_data: ServiceCreate, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     existing = db.query(Service).filter(Service.name == service_data.name).first()
     if existing:
         raise HTTPException(status_code=409, detail="Service with this name already exists")
@@ -45,7 +47,12 @@ def create_service(service_data: ServiceCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{service_id}", response_model=ServiceResponse)
-def update_service(service_id: UUID, service_data: ServiceUpdate, db: Session = Depends(get_db)):
+def update_service(
+    service_id: UUID,
+    service_data: ServiceUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -60,7 +67,7 @@ def update_service(service_id: UUID, service_data: ServiceUpdate, db: Session = 
 
 
 @router.delete("/{service_id}", status_code=204)
-def delete_service(service_id: UUID, db: Session = Depends(get_db)):
+def delete_service(service_id: UUID, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -75,6 +82,7 @@ def trigger_deployment(
     service_id: UUID,
     body: TriggerDeploymentRequest,
     db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """Dispatch a GitHub Actions workflow and record a deployment with status 'building'."""
     if not config.GITHUB_TOKEN:
@@ -89,8 +97,6 @@ def trigger_deployment(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    # Create the deployment record first so we have an ID to pass to the workflow.
-    # If GitHub dispatch fails we mark it failed immediately.
     image_uri = body.image_uri or f"{repo}:{body.version}"
     deployment = Deployment(
         service_id=service_id,
