@@ -26,6 +26,7 @@ class DeploymentCreate(BaseModel):
 
 class DeploymentUpdate(BaseModel):
     status: Optional[DeploymentStatusEnum] = None
+    commit_sha: Optional[str] = None
     finished_at: Optional[datetime] = None
     notes: Optional[str] = None
 
