@@ -29,7 +29,6 @@ env:
   FRONTEND_TASK_FAMILY: serviceforge-production-frontend
   SERVICEFORGE_API: http://serviceforge-production-alb-1977889151.us-east-1.elb.amazonaws.com
   SERVICEFORGE_SERVICE_ID: bb1dda36-8785-4170-b26d-8379747f6434
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ── Register deployment record ───────────────────────────────────────────
