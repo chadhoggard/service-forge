@@ -2,6 +2,8 @@
 
 A self-service deployment platform for containerized applications. ServiceForge lets you register GitHub repositories as services, trigger deployments via GitHub Actions, track deployment history with semantic versioning, run health checks, and monitor everything from a dashboard — deployed on AWS ECS Fargate with full IaC via Terraform.
 
+**[Live →](http://serviceforge-production-alb-1977889151.us-east-1.elb.amazonaws.com)**
+
 ## Architecture
 
 ### Production (AWS)
