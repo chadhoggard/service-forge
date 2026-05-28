@@ -7,7 +7,8 @@ interface Props {
 }
 
 function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+  const utc = iso.endsWith("Z") ? iso : iso + "Z";
+  const diff = Date.now() - new Date(utc).getTime();
   const m = Math.floor(diff / 60_000);
   if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
@@ -18,8 +19,10 @@ function relativeTime(iso: string): string {
 
 function deployDuration(start: string | null, end: string | null): string {
   if (!start || !end) return "—";
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  if (ms < 0) return "—";
+  const startUtc = start.endsWith("Z") ? start : start + "Z";
+  const endUtc = end.endsWith("Z") ? end : end + "Z";
+  const ms = new Date(endUtc).getTime() - new Date(startUtc).getTime();
+  if (ms < 1000) return "< 1s";
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
   return `${Math.floor(s / 60)}m ${s % 60}s`;

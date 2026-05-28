@@ -28,13 +28,53 @@ env:
   BACKEND_TASK_FAMILY: serviceforge-production-backend
   FRONTEND_TASK_FAMILY: serviceforge-production-frontend
   SERVICEFORGE_API: http://serviceforge-production-alb-1977889151.us-east-1.elb.amazonaws.com
+  SERVICEFORGE_SERVICE_ID: bb1dda36-8785-4170-b26d-8379747f6434
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ── Register deployment record ───────────────────────────────────────────
+  register-deployment:
+    name: Register Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      deployment_id: ${{ steps.register.outputs.deployment_id }}
+
+    steps:
+      - name: Create or reuse deployment record
+        id: register
+        run: |
+          # If triggered from the ServiceForge UI, the deployment record already exists
+          if [ -n "${{ github.event.inputs.deployment_id }}" ]; then
+            echo "deployment_id=${{ github.event.inputs.deployment_id }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Auto push: create a new deployment record in ServiceForge
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+
+          PAYLOAD="$(jq -n \
+            --arg service_id "${{ env.SERVICEFORGE_SERVICE_ID }}" \
+            --arg version "sha-${SHORT_SHA}" \
+            --arg commit_sha "${{ github.sha }}" \
+            --arg environment "production" \
+            --arg status "building" \
+            --arg notes "Auto-deployed from push to main (run ${{ github.run_id }})" \
+            '{service_id: $service_id, version: $version, commit_sha: $commit_sha, environment: $environment, status: $status, notes: $notes}')"
+
+          RESPONSE="$(curl -sf -X POST \
+            "${{ env.SERVICEFORGE_API }}/api/deployments/" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo '{}')"
+
+          DEPLOYMENT_ID="$(echo "$RESPONSE" | jq -r '.id // empty')"
+          echo "deployment_id=${DEPLOYMENT_ID}" >> $GITHUB_OUTPUT
+
   # ── Build & push backend ─────────────────────────────────────────────────
   build-backend:
     name: Build & Push Backend
     runs-on: ubuntu-latest
+    needs: [register-deployment]
     outputs:
       image_uri: ${{ steps.image.outputs.uri }}
 
@@ -80,6 +120,7 @@ jobs:
   build-frontend:
     name: Build & Push Frontend
     runs-on: ubuntu-latest
+    needs: [register-deployment]
     outputs:
       image_uri: ${{ steps.image.outputs.uri }}
 
@@ -201,8 +242,8 @@ jobs:
   notify-serviceforge:
     name: Update ServiceForge Deployment
     runs-on: ubuntu-latest
-    needs: [deploy-backend, deploy-frontend]
-    if: always() && github.event.inputs.deployment_id != ''
+    needs: [register-deployment, deploy-backend, deploy-frontend]
+    if: always() && needs.register-deployment.outputs.deployment_id != ''
 
     steps:
       - name: Determine final status
@@ -228,6 +269,6 @@ jobs:
             --arg finished_at "$FINISHED_AT" \
             '{status: $status, notes: $notes, commit_sha: $commit_sha, finished_at: $finished_at}')"
           curl -s -X PATCH \
-            "${{ env.SERVICEFORGE_API }}/api/deployments/${{ github.event.inputs.deployment_id }}" \
+            "${{ env.SERVICEFORGE_API }}/api/deployments/${{ needs.register-deployment.outputs.deployment_id }}" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"
