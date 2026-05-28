@@ -60,7 +60,7 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
-      Resource = [var.db_secret_arn]
+      Resource = [var.db_secret_arn, var.github_secret_arn]
     }]
   })
 }
@@ -161,6 +161,14 @@ resource "aws_ecs_task_definition" "backend" {
       {
         name      = "DB_PASSWORD"
         valueFrom = "${var.db_secret_arn}:password::"
+      },
+      {
+        name      = "GITHUB_TOKEN"
+        valueFrom = "${var.github_secret_arn}:GITHUB_TOKEN::"
+      },
+      {
+        name      = "GITHUB_WORKFLOW_FILE"
+        valueFrom = "${var.github_secret_arn}:GITHUB_WORKFLOW_FILE::"
       }
     ]
 
