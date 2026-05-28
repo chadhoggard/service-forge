@@ -54,6 +54,19 @@ module "alb" {
   alb_security_group_id = module.vpc.alb_security_group_id
 }
 
+# ── CloudWatch ─────────────────────────────────────────────────────────────
+module "cloudwatch" {
+  source      = "./modules/cloudwatch"
+  project     = var.project
+  environment = var.environment
+  aws_region  = var.aws_region
+
+  cluster_name          = module.ecs.cluster_name
+  backend_service_name  = module.ecs.backend_service_name
+  frontend_service_name = module.ecs.frontend_service_name
+  alb_arn_suffix        = module.alb.alb_arn_suffix
+}
+
 # ── ECS ────────────────────────────────────────────────────────────────────
 module "ecs" {
   source      = "./modules/ecs"
