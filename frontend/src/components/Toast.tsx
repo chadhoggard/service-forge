@@ -29,9 +29,10 @@ export default function Toast({
   message,
   type = "info",
   onDismiss,
-  duration = 4000,
+  duration = type === "error" ? Infinity : 4000,
 }: Props) {
   useEffect(() => {
+    if (!isFinite(duration)) return;
     const t = setTimeout(onDismiss, duration);
     return () => clearTimeout(t);
   }, [onDismiss, duration]);
