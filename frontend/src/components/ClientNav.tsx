@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -17,9 +18,7 @@ export default function ClientNav() {
   return (
     <div className="flex items-center justify-between h-14">
       <Link href="/" className="flex items-center gap-2.5 group">
-        <div className="w-7 h-7 bg-forge-600 rounded-lg flex items-center justify-center shadow-sm group-hover:bg-forge-700 transition-colors">
-          <span className="text-white font-bold text-xs tracking-tight">SF</span>
-        </div>
+        <Image src="/logo.png" alt="ServiceForge" width={28} height={28} className="rounded-lg" />
         <span className="text-base font-bold text-gray-900">ServiceForge</span>
       </Link>
 

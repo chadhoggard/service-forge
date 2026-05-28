@@ -12,6 +12,7 @@ export const metadata: Metadata = {
   },
   description:
     "Self-service deployment platform for containerized applications",
+  icons: { icon: "/favicon.png" },
 };
 
 export default function RootLayout({

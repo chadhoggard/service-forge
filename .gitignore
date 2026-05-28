@@ -21,6 +21,12 @@ postgres_data/
 .vscode/
 .idea/
 
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/tfplan
+
 # OS
 .DS_Store
 Thumbs.db
