@@ -49,13 +49,17 @@ jobs:
             exit 0
           fi
 
-          # Auto push: create a new deployment record in ServiceForge
-          SHORT_SHA="${{ github.sha }}"
-          SHORT_SHA="${SHORT_SHA:0:7}"
+          # Auto push: determine next semantic version by querying the latest
+          DEPLOYMENTS="$(curl -s "${{ env.SERVICEFORGE_API }}/api/deployments/service/${{ env.SERVICEFORGE_SERVICE_ID }}/")"
+          LATEST_VERSION="$(echo "$DEPLOYMENTS" | jq -r '[.[] | select(.version | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | sort_by(.version) | last | .version // "v1.0.0"')"
+
+          # Increment patch number
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST_VERSION#v}"
+          NEXT_VERSION="v${MAJOR}.${MINOR}.$((PATCH + 1))"
 
           PAYLOAD="$(jq -n \
             --arg service_id "${{ env.SERVICEFORGE_SERVICE_ID }}" \
-            --arg version "sha-${SHORT_SHA}" \
+            --arg version "$NEXT_VERSION" \
             --arg commit_sha "${{ github.sha }}" \
             --arg environment "production" \
             --arg status "building" \
