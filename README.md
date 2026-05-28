@@ -1,36 +1,63 @@
 # ServiceForge
 
-A self-service deployment platform for containerized applications. ServiceForge lets you register GitHub repositories as services, track deployments, view health checks, and manage deployment metadata — all from a clean dashboard UI.
+A self-service deployment platform for containerized applications. ServiceForge lets you register GitHub repositories as services, trigger deployments via GitHub Actions, track deployment history with semantic versioning, run health checks, and monitor everything from a dashboard — deployed on AWS ECS Fargate with full IaC via Terraform.
 
 ## Architecture
 
+### Production (AWS)
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │              AWS us-east-1              │
+                    │                                         │
+  Browser ─────────►│  [ALB]  serviceforge-production-alb     │
+                    │    │                                    │
+                    │    ├── /api/* ──► [ECS Fargate]         │
+                    │    │              FastAPI :8000          │
+                    │    │              └── [RDS PostgreSQL]   │
+                    │    │                                    │
+                    │    └── /* ──────► [ECS Fargate]         │
+                    │                   Next.js :3000         │
+                    │                                         │
+  GitHub Actions ──►│  [ECR] ← built images                  │
+                    │  [Secrets Manager] ← credentials        │
+                    │  [CloudWatch] ← logs, metrics, alarms   │
+                    └─────────────────────────────────────────┘
+```
+
+### Local (Docker Compose)
+
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│                 │     │                 │     │                 │
 │   Next.js       │────▶│   FastAPI       │────▶│  PostgreSQL     │
-│   Frontend      │     │   Backend       │     │  Database       │
 │   :3000         │     │   :8000         │     │   :5432         │
-│                 │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
-## Features (MVP)
+## Features
 
 - **Service Registration** — Register services with name, GitHub repo URL, environment, health check URL, and description
-- **Deployment Tracking** — Create and track deployment records with version, image URI, status, commit SHA, and timestamps
-- **Health Checks** — Call service health endpoints and store results
-- **Rollback Simulation** — Roll back to a previous successful deployment
-- **Dashboard** — View all services with latest deployment status and health at a glance
+- **Deployment Tracking** — Trigger GitHub Actions workflows directly from the UI; auto-increments semantic versions; tracks status, commit SHA, and timestamps in real time
+- **Zero-Downtime Deploys** — ECS rolling deploys with circuit breaker auto-rollback on failed health checks
+- **Health Checks** — Call service health endpoints on demand and store results
+- **Rollback** — Roll back to any previous successful deployment
+- **Dashboard** — All services with latest deployment status and health at a glance
+- **Authentication** — JWT-based login; first-user registration; bcrypt password hashing
+- **Observability** — CloudWatch alarms for CPU, memory, and 5xx errors; metrics dashboard
 
 ## Tech Stack
 
-| Layer           | Technology                           |
-| --------------- | ------------------------------------ |
-| Frontend        | Next.js 14, TypeScript, Tailwind CSS |
-| Backend         | FastAPI, Python 3.11, SQLAlchemy     |
-| Database        | PostgreSQL 16                        |
-| Container       | Docker, Docker Compose               |
-| Cloud (planned) | AWS ECS, ECR, CloudWatch, Terraform  |
+| Layer         | Technology                                              |
+| ------------- | ------------------------------------------------------- |
+| Frontend      | Next.js 14, TypeScript, Tailwind CSS                    |
+| Backend       | FastAPI, Python 3.11, SQLAlchemy                        |
+| Database      | PostgreSQL 15 (RDS)                                     |
+| Auth          | JWT (python-jose), bcrypt                               |
+| Container     | Docker, Docker Compose                                  |
+| Cloud         | AWS ECS Fargate, ECR, RDS, ALB, Secrets Manager        |
+| IaC           | Terraform (VPC, ECS, RDS, ALB, ECR, CloudWatch)        |
+| CI/CD         | GitHub Actions — build → ECR → ECS rolling deploy      |
+| Monitoring    | CloudWatch alarms + dashboard, Container Insights       |
 
 ## Local Setup
 
@@ -68,12 +95,14 @@ Once running:
 
 ### Environment Variables
 
-| File                  | Variable              | Default                                                              | Description                   |
-| --------------------- | --------------------- | -------------------------------------------------------------------- | ----------------------------- |
-| `backend/.env`        | `DATABASE_URL`        | `postgresql://serviceforge:serviceforge@localhost:5432/serviceforge` | PostgreSQL connection string  |
-| `backend/.env`        | `GITHUB_TOKEN`        | _(empty)_                                                            | GitHub fine-grained token     |
-| `backend/.env`        | `GITHUB_WORKFLOW_FILE`| `deploy.yml`                                                         | Workflow file to dispatch     |
-| `frontend/.env.local` | `NEXT_PUBLIC_API_URL` | `http://localhost:8000`                                              | Backend URL (browser-visible) |
+| File                  | Variable               | Default                                                              | Description                          |
+| --------------------- | ---------------------- | -------------------------------------------------------------------- | ------------------------------------ |
+| `backend/.env`        | `DATABASE_URL`         | `postgresql://serviceforge:serviceforge@localhost:5432/serviceforge` | PostgreSQL connection string         |
+| `backend/.env`        | `GITHUB_TOKEN`         | _(empty)_                                                            | GitHub fine-grained token            |
+| `backend/.env`        | `GITHUB_WORKFLOW_FILE` | `deploy.yml`                                                         | Workflow file to dispatch            |
+| `backend/.env`        | `SECRET_KEY`           | _(empty)_                                                            | JWT signing secret (required)        |
+| `backend/.env`        | `SERVICEFORGE_API_KEY` | _(empty)_                                                            | API key for CI/CD callbacks          |
+| `frontend/.env.local` | `NEXT_PUBLIC_API_URL`  | `http://localhost:8000`                                              | Backend URL (browser-visible)        |
 
 ### Docker Compose Commands
 
@@ -223,6 +252,7 @@ jobs:
         run: |
           curl -s -X PATCH ${{ secrets.SERVICEFORGE_API_URL }}/api/deployments/${{ inputs.deployment_id }} \
             -H "Content-Type: application/json" \
+            -H "X-Api-Key: ${{ secrets.SERVICEFORGE_API_KEY }}" \
             -d '{"status": "succeeded"}'
 
       - name: Report failure to ServiceForge
@@ -230,10 +260,11 @@ jobs:
         run: |
           curl -s -X PATCH ${{ secrets.SERVICEFORGE_API_URL }}/api/deployments/${{ inputs.deployment_id }} \
             -H "Content-Type: application/json" \
+            -H "X-Api-Key: ${{ secrets.SERVICEFORGE_API_KEY }}" \
             -d '{"status": "failed"}'
 ```
 
-Add `SERVICEFORGE_API_URL` as a secret in your repo settings (e.g. `http://your-serviceforge-host:8000`).
+Add `SERVICEFORGE_API_URL` and `SERVICEFORGE_API_KEY` as secrets in your repo settings.
 
 ### 4. Test Locally
 
@@ -258,6 +289,16 @@ Add `SERVICEFORGE_API_URL` as a secret in your repo settings (e.g. `http://your-
 ---
 
 ## API Endpoints
+
+All endpoints except `/api/health`, `/api/auth/register`, and `/api/auth/login` require an `Authorization: Bearer <token>` header. CI/CD endpoints (`/api/deployments/*`) also accept an `X-Api-Key` header in place of a JWT.
+
+### Auth
+
+| Method | Endpoint               | Description                              |
+| ------ | ---------------------- | ---------------------------------------- |
+| POST   | /api/auth/register     | Create first admin account (closes after first user) |
+| POST   | /api/auth/login        | Login — returns JWT access token         |
+| GET    | /api/auth/me           | Get current user                         |
 
 ### Services
 
@@ -290,78 +331,91 @@ Add `SERVICEFORGE_API_URL` as a secret in your repo settings (e.g. `http://your-
 ## Project Structure
 
 ```
-serviceforge/
+service-forge/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py           # FastAPI app entry point
+│   │   ├── main.py           # FastAPI app entry point, CORS, route registration
 │   │   ├── config.py         # Configuration / env vars
 │   │   ├── database.py       # SQLAlchemy engine & session
 │   │   ├── models/           # SQLAlchemy ORM models
+│   │   │   ├── user.py
 │   │   │   ├── service.py
 │   │   │   ├── deployment.py
 │   │   │   └── health_check.py
 │   │   ├── schemas/          # Pydantic request/response schemas
+│   │   │   ├── auth.py
 │   │   │   ├── service.py
 │   │   │   ├── deployment.py
 │   │   │   └── health_check.py
-│   │   └── routes/           # API route handlers
-│   │       ├── services.py
-│   │       ├── deployments.py
-│   │       └── health_checks.py
+│   │   ├── routes/           # API route handlers
+│   │   │   ├── auth.py
+│   │   │   ├── services.py
+│   │   │   ├── deployments.py
+│   │   │   └── health_checks.py
+│   │   └── utils/
+│   │       ├── auth.py       # JWT, bcrypt, auth dependencies
+│   │       └── github.py     # GitHub Actions dispatch helpers
 │   ├── requirements.txt
 │   ├── Dockerfile
-│   └── .env
+│   └── .env.example
 ├── frontend/
 │   ├── src/
-│   │   ├── app/              # Next.js App Router pages
+│   │   ├── app/
+│   │   │   ├── (protected)/  # Route group — requires auth
+│   │   │   │   ├── layout.tsx
+│   │   │   │   ├── page.tsx  # Dashboard
+│   │   │   │   └── services/ # Service detail, new, edit pages
+│   │   │   ├── login/
+│   │   │   └── register/
 │   │   ├── components/       # Reusable UI components
-│   │   ├── lib/              # API client
+│   │   ├── context/
+│   │   │   └── AuthContext.tsx
+│   │   ├── lib/
+│   │   │   └── api.ts        # Typed API client
 │   │   └── types/            # TypeScript types
 │   ├── Dockerfile
-│   ├── Dockerfile.dev
 │   └── package.json
-├── infra/                    # Future Terraform files
+├── infra/                    # Terraform infrastructure
+│   ├── main.tf               # Root module — wires all modules together
+│   ├── variables.tf
+│   ├── outputs.tf
+│   └── modules/
+│       ├── ecr/              # ECR repositories
+│       ├── vpc/              # VPC, subnets, NAT, security groups
+│       ├── rds/              # PostgreSQL on RDS + Secrets Manager
+│       ├── ecs/              # Fargate cluster, task definitions, services
+│       ├── alb/              # Application Load Balancer + target groups
+│       ├── cloudwatch/       # Alarms + dashboard
+│       └── app_secrets/      # JWT secret + API key in Secrets Manager
+├── .github/
+│   └── workflows/
+│       └── deploy.yml        # CI/CD: build → ECR → ECS → callback
 ├── docker-compose.yml
 └── README.md
 ```
 
-## AWS Deployment Roadmap
+## Infrastructure
 
-### Phase 1: Container Registry
+All AWS infrastructure is managed with Terraform and lives in `infra/`. State is stored in S3.
 
-- Push Docker images to Amazon ECR
-- Tag images with git SHA and semantic version
+| Module         | Resources                                                        |
+| -------------- | ---------------------------------------------------------------- |
+| `ecr`          | Backend and frontend ECR repositories with lifecycle policies    |
+| `vpc`          | VPC, public/private subnets across 2 AZs, NAT gateway, 4 SGs   |
+| `rds`          | PostgreSQL 15 on RDS, random password stored in Secrets Manager  |
+| `ecs`          | Fargate cluster, task definitions, rolling-deploy services       |
+| `alb`          | ALB with path-based routing (`/api/*` → backend, `/*` → frontend)|
+| `cloudwatch`   | CPU/memory/5xx alarms + metrics dashboard                        |
+| `app_secrets`  | Auto-generated JWT signing key and CI/CD API key in Secrets Manager |
 
-### Phase 2: ECS Deployment
+To apply infrastructure changes:
 
-- Deploy backend and frontend to ECS Fargate
-- Configure ALB for routing
-- Set up service discovery
-
-### Phase 3: Infrastructure as Code
-
-- Terraform modules for:
-  - VPC and networking
-  - ECS cluster and services
-  - ECR repositories
-  - IAM roles and policies
-  - RDS PostgreSQL
-  - CloudWatch log groups and alarms
-
-### Phase 4: CI/CD Pipeline
-
-- GitHub Actions workflows:
-  - Build and push images on merge to main
-  - Run tests on PR
-  - Deploy to staging automatically
-  - Deploy to production with manual approval
-
-### Phase 5: Observability
-
-- CloudWatch metrics and dashboards
-- Container Insights
-- Alarm notifications via SNS
-- Structured logging with correlation IDs
+```bash
+cd infra
+terraform init
+terraform plan
+terraform apply
+```
 
 ## License
 
