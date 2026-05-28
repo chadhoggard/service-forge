@@ -465,6 +465,7 @@ export default function ServiceDetailPage() {
             <DeploymentTable
               deployments={deployments}
               onRollback={handleRollback}
+              repoUrl={service.repo_url}
             />
           )}
         </div>

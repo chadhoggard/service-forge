@@ -4,6 +4,7 @@ import StatusBadge from "./StatusBadge";
 interface Props {
   deployments: Deployment[];
   onRollback: (deploymentId: string) => void;
+  repoUrl?: string;
 }
 
 function relativeTime(iso: string): string {
@@ -28,6 +29,13 @@ function deployDuration(start: string | null, end: string | null): string {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+function githubRunUrl(repoUrl: string | undefined, notes: string | null): string | null {
+  if (!repoUrl || !notes) return null;
+  const match = notes.match(/\(run (\d+)\)/);
+  if (!match) return null;
+  return `${repoUrl.replace(/\.git$/, "")}/actions/runs/${match[1]}`;
+}
+
 const HEADERS = [
   "Version",
   "Status",
@@ -38,7 +46,7 @@ const HEADERS = [
   "",
 ];
 
-export default function DeploymentTable({ deployments, onRollback }: Props) {
+export default function DeploymentTable({ deployments, onRollback, repoUrl }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-separate border-spacing-0">
@@ -55,7 +63,9 @@ export default function DeploymentTable({ deployments, onRollback }: Props) {
           </tr>
         </thead>
         <tbody>
-          {deployments.map((d) => (
+          {deployments.map((d) => {
+            const runUrl = githubRunUrl(repoUrl, d.notes);
+            return (
             <tr key={d.id} className="group hover:bg-gray-50 transition-colors">
               <td className="py-3 px-3 border-b border-gray-100">
                 <span className="font-mono font-medium text-gray-900">
@@ -67,12 +77,24 @@ export default function DeploymentTable({ deployments, onRollback }: Props) {
               </td>
               <td className="py-3 px-3 border-b border-gray-100">
                 {d.commit_sha ? (
-                  <span
-                    className="font-mono text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded cursor-default"
-                    title={d.commit_sha}
-                  >
-                    {d.commit_sha.slice(0, 7)}
-                  </span>
+                  repoUrl ? (
+                    <a
+                      href={`${repoUrl.replace(/\.git$/, "")}/commit/${d.commit_sha}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-xs text-forge-600 hover:text-forge-800 bg-gray-100 px-1.5 py-0.5 rounded hover:underline"
+                      title={d.commit_sha}
+                    >
+                      {d.commit_sha.slice(0, 7)}
+                    </a>
+                  ) : (
+                    <span
+                      className="font-mono text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded cursor-default"
+                      title={d.commit_sha}
+                    >
+                      {d.commit_sha.slice(0, 7)}
+                    </span>
+                  )
                 ) : (
                   <span className="text-gray-300">—</span>
                 )}
@@ -89,17 +111,31 @@ export default function DeploymentTable({ deployments, onRollback }: Props) {
                 </span>
               </td>
               <td className="py-3 px-3 border-b border-gray-100 text-right">
-                {d.status === "succeeded" && (
-                  <button
-                    onClick={() => onRollback(d.id)}
-                    className="text-xs font-medium text-forge-600 hover:text-forge-800 hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    Rollback
-                  </button>
-                )}
+                <div className="flex items-center justify-end gap-3">
+                  {runUrl && (
+                    <a
+                      href={runUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-medium text-gray-400 hover:text-gray-700 hover:underline"
+                      title="View GitHub Actions run"
+                    >
+                      Actions ↗
+                    </a>
+                  )}
+                  {d.status === "succeeded" && (
+                    <button
+                      onClick={() => onRollback(d.id)}
+                      className="text-xs font-medium text-forge-600 hover:text-forge-800 hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      Rollback
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
