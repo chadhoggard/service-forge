@@ -38,7 +38,7 @@ A self-service deployment platform for containerized applications. ServiceForge 
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
 - Git
-- Node.js 20+ and Python 3.11+ _(only needed for running outside Docker)_
+- Node.js 22+ and Python 3.11+ _(only needed for running outside Docker)_
 
 ### Quick Start with Docker Compose
 
