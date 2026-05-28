@@ -53,9 +53,10 @@ jobs:
           DEPLOYMENTS="$(curl -s "${{ env.SERVICEFORGE_API }}/api/deployments/service/${{ env.SERVICEFORGE_SERVICE_ID }}/")"
           LATEST_VERSION="$(echo "$DEPLOYMENTS" | jq -r '[.[] | select(.version | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | sort_by(.version) | last | .version // "v1.0.0"')"
 
-          # Increment patch number
-          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST_VERSION#v}"
-          NEXT_VERSION="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          # Increment patch using parameter expansion (avoid IFS splitting issues)
+          PATCH="${LATEST_VERSION##*.}"
+          PREFIX="${LATEST_VERSION%.*}"
+          NEXT_VERSION="${PREFIX}.$((PATCH + 1))"
 
           PAYLOAD="$(jq -n \
             --arg service_id "${{ env.SERVICEFORGE_SERVICE_ID }}" \
