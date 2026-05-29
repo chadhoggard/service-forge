@@ -40,8 +40,9 @@ A self-service deployment platform for containerized applications. ServiceForge 
 
 - **Service Registration** — Register services with name, GitHub repo URL, environment, health check URL, and description
 - **Deployment Tracking** — Trigger GitHub Actions workflows directly from the UI; auto-increments semantic versions; tracks status, commit SHA, and timestamps in real time
+- **GitHub Actions Links** — Each deployment row links directly to the GitHub commit and the exact Actions run that produced it
 - **Zero-Downtime Deploys** — ECS rolling deploys with circuit breaker auto-rollback on failed health checks
-- **Health Checks** — Call service health endpoints on demand and store results
+- **Health Checks** — Ping service health endpoints on demand; run checks on all services at once from the dashboard
 - **Rollback** — Roll back to any previous successful deployment
 - **Dashboard** — All services with latest deployment status and health at a glance
 - **Authentication** — JWT-based login; first-user registration; bcrypt password hashing
