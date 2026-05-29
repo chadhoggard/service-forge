@@ -16,30 +16,30 @@ export default function ClientNav() {
   }
 
   return (
-    <div className="flex items-center justify-between h-14">
-      <Link href="/" className="flex items-center gap-2.5 group">
-        <Image src="/logo.png" alt="ServiceForge" width={28} height={28} className="rounded-lg" />
-        <span className="text-base font-bold text-gray-900">ServiceForge</span>
+    <div className="flex items-center justify-between py-4">
+      <Link href="/" className="flex items-center gap-2 group">
+        <Image src="/logo.png" alt="ServiceForge" width={32} height={32} className="rounded-lg" />
+        <span className="text-xl font-bold text-gray-900">ServiceForge</span>
       </Link>
 
       {user ? (
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-6">
           <Link
             href="/"
-            className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            className="text-gray-600 hover:text-gray-900 font-medium"
           >
             Dashboard
           </Link>
           <Link
             href="/services/new"
-            className="ml-2 px-3 py-1.5 text-sm font-medium bg-forge-600 text-white rounded-lg hover:bg-forge-700 transition-colors"
+            className="text-gray-600 hover:text-gray-900 font-medium"
           >
             + New Service
           </Link>
-          <span className="ml-3 text-xs text-gray-400">{user.email}</span>
+          <span className="text-sm text-gray-400">{user.email}</span>
           <button
             onClick={handleLogout}
-            className="ml-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            className="text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             Sign out
           </button>
